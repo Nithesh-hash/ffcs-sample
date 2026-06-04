@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIT-FFCS Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface2: #f0f2f8;
+  --border: #dde1ef;
+  --accent: #4f46e5;
+  --accent2: #059669;
+  --accent3: #dc2626;
+  --accent-light: #ede9fe;
+  --text: #1e1f2e;
+  --text-muted: #6b7280;
+  --blue: #2563eb;
+  --font: 'Sora', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(79,70,229,0.07);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; display: flex; flex-direction: column; }
+
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: #fff; border-bottom: 1.5px solid var(--border);
+  box-shadow: 0 1px 8px rgba(79,70,229,0.06);
+  padding: 0 28px; display: flex; align-items: center; justify-content: space-between; height: 60px;
+}
+.logo { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.5px; }
+.logo .vit { color: var(--text); }
+.logo .connect { color: var(--accent); }
+.nav-right { display: flex; gap: 10px; align-items: center; }
+.nav-badge { font-family: var(--mono); font-size: 0.68rem; background: var(--surface2); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; color: var(--text-muted); }
+.credit-badge { font-family: var(--mono); font-size: 0.8rem; background: var(--accent-light); border: 1.5px solid var(--accent); padding: 5px 16px; border-radius: 20px; color: var(--accent); font-weight: 700; transition: all .2s; }
+.credit-badge.warn { background: #fef3c7; border-color: #d97706; color: #d97706; }
+.credit-badge.over { background: #fee2e2; border-color: var(--accent3); color: var(--accent3); }
+
+main { flex: 1; display: grid; grid-template-columns: 370px 1fr; }
+
+.sidebar {
+  background: #fff; border-right: 1.5px solid var(--border);
+  display: flex; flex-direction: column;
+  height: calc(100vh - 60px); position: sticky; top: 60px; overflow: hidden;
+}
+.sidebar-tabs { display: flex; border-bottom: 1.5px solid var(--border); background: var(--surface2); }
+.tab-btn {
+  flex: 1; padding: 13px 6px; font-family: var(--font); font-size: 0.78rem; font-weight: 700;
+  background: transparent; border: none; cursor: pointer; color: var(--text-muted);
+  border-bottom: 2.5px solid transparent; transition: all .15s; letter-spacing: 0.02em;
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: #fff; }
+.tab-content { display: none; flex: 1; overflow-y: auto; padding: 18px; flex-direction: column; gap: 12px; }
+.tab-content.active { display: flex; }
+
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; }
+input, select {
+  background: var(--surface2); border: 1.5px solid var(--border); color: var(--text);
+  padding: 9px 13px; border-radius: 7px; font-family: var(--font); font-size: 0.88rem;
+  transition: all .15s; width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(79,70,229,0.08); }
+input::placeholder { color: #b0b5c5; }
+select option { background: #fff; }
+
+.btn {
+  padding: 9px 18px; border-radius: 7px; font-family: var(--font); font-size: 0.84rem;
+  font-weight: 700; cursor: pointer; border: none; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,0.18); }
+.btn-primary:hover { background: #3730a3; transform: translateY(-1px); }
+.btn-success { background: var(--accent2); color: #fff; }
+.btn-success:hover { background: #047857; transform: translateY(-1px); }
+.btn-danger { background: var(--accent3); color: #fff; }
+.btn-danger:hover { background: #b91c1c; }
+.btn-sm { padding: 4px 10px; font-size: 0.73rem; border-radius: 5px; }
+.btn-block { width: 100%; justify-content: center; }
+.btn-nav { padding: 7px 15px; font-size: 0.8rem; }
+
+.divider { height: 1px; background: var(--border); margin: 2px 0; }
+.info-hint { font-size: 0.7rem; color: var(--text-muted); line-height: 1.5; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* COURSE LIST */
+.list-wrap { display: flex; flex-direction: column; gap: 7px; }
+.course-item {
+  background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer; transition: all .15s;
+}
+.course-item:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+.course-name { font-size: 0.82rem; font-weight: 700; }
+.course-meta { font-size: 0.7rem; color: var(--text-muted); font-family: var(--mono); margin-top: 2px; }
+.credit-pill { font-size: 0.68rem; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 20px; font-family: var(--mono); font-weight: 700; white-space: nowrap; }
+
+/* FACULTY GROUPS */
+.faculty-group {
+  background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden;
+}
+.faculty-group-head {
+  background: #fff; padding: 9px 12px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.faculty-group-title { font-weight: 700; font-size: 0.82rem; }
+.faculty-group-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; }
+.faculty-rows { display: flex; flex-direction: column; }
+.faculty-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-bottom: 1px solid var(--border); transition: background .12s; cursor: pointer;
+}
+.faculty-row:last-child { border-bottom: none; }
+.faculty-row:hover { background: #fff; }
+.faculty-row.is-selected { background: #f0fdf4; }
+.fac-radio { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+.fac-info { flex: 1; min-width: 0; }
+.fac-name { font-size: 0.8rem; font-weight: 600; }
+.fac-meta { font-size: 0.68rem; color: var(--text-muted); font-family: var(--mono); margin-top: 1px; }
+.fac-slot { color: var(--accent2); font-weight: 700; }
+
+/* SELECTED */
+.selected-item {
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  border-left-width: 4px;
+}
+
+/* CONTENT */
+.content { padding: 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 22px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.section-title { font-size: 0.95rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.s-bar { width: 3px; height: 16px; border-radius: 2px; background: var(--accent); display: inline-block; flex-shrink: 0; }
+
+/* TOGGLE */
+.tt-toggle { display: flex; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+.tog-btn {
+  padding: 7px 18px; font-family: var(--font); font-size: 0.78rem; font-weight: 700;
+  border: none; cursor: pointer; background: transparent; color: var(--text-muted);
+  transition: all .13s; letter-spacing: 0.02em;
+}
+.tog-btn.active { background: var(--accent); color: #fff; }
+
+/* TIMETABLE */
+.tt-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); overflow: auto; box-shadow: var(--shadow); }
+.tt-tbl { width: 100%; border-collapse: collapse; min-width: 800px; }
+.tt-tbl th, .tt-tbl td { border: 1px solid var(--border); padding: 0; text-align: center; vertical-align: middle; }
+.day-th { font-size: 0.72rem; font-weight: 800; color: var(--accent); padding: 0 8px; background: var(--surface2); min-width: 48px; }
+.type-th { font-size: 0.6rem; font-weight: 800; padding: 6px 6px; letter-spacing: 0.08em; text-transform: uppercase; min-width: 48px; color: #fff; }
+.time-th { font-size: 0.62rem; font-family: var(--mono); padding: 6px 4px; min-width: 90px; line-height: 1.5; }
+.lunch-th { background: #f0f2f8; min-width: 22px; }
+.lunch-lbl { font-size: 0.5rem; color: var(--text-muted); writing-mode: vertical-rl; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+.slot-cell { cursor: pointer; height: 60px; padding: 4px 3px; transition: background .12s; }
+.slot-cell:hover { background: #f5f3ff !important; }
+.s-code { font-size: 0.6rem; font-family: var(--mono); color: #c4c9da; display: block; line-height: 1.2; margin-bottom: 1px; }
+.s-name { font-size: 0.67rem; font-weight: 700; display: block; line-height: 1.2; }
+.s-venue { font-size: 0.58rem; color: var(--text-muted); display: block; }
+
+/* REPORT */
+.report-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.report-tbl { width: 100%; border-collapse: collapse; }
+.report-tbl thead tr { background: #f0f2f8; border-bottom: 2px solid var(--accent); }
+.report-tbl th { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-align: left; padding: 11px 14px; letter-spacing: 0.05em; text-transform: uppercase; }
+.report-tbl td { padding: 11px 14px; font-size: 0.83rem; border-bottom: 1px solid var(--border); }
+.report-tbl tbody tr:hover td { background: #f8f9fe; }
+.report-total td { background: #f0f2f8 !important; font-weight: 800; color: var(--accent2); }
+
+/* ALERT */
+.alert { padding: 10px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; }
+.alert-error { background: #fee2e2; border: 1px solid #fca5a5; color: var(--accent3); }
+.alert-success { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+.alert-info { background: var(--accent-light); border: 1px solid #a5b4fc; color: var(--accent); }
+
+footer {
+  background: #fff; border-top: 1.5px solid var(--border);
+  padding: 12px 28px; display: flex; align-items: center; justify-content: space-between;
+}
+.footer-text { font-size: 0.78rem; color: var(--text-muted); }
+.footer-text strong { color: var(--accent); }
+.linkedin-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 16px; background: #0077b5; border-radius: 7px;
+  color: #fff; text-decoration: none; font-size: 0.78rem; font-weight: 700; transition: all .15s;
+}
+.linkedin-btn:hover { background: #005f91; transform: translateY(-1px); }
+.linkedin-btn svg { width: 15px; height: 15px; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.empty-state { text-align: center; padding: 28px 12px; color: var(--text-muted); font-size: 0.82rem; }
+
+/* PASTE PANEL */
+.paste-panel { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+.paste-panel-head {
+  background: #fff; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border); cursor: pointer; user-select: none;
+}
+.paste-panel-head:hover { background: var(--accent-light); }
+.paste-panel-title { font-size: 0.8rem; font-weight: 700; color: var(--accent); }
+.paste-panel-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.paste-panel-body.hidden { display: none; }
+textarea.paste-box {
+  width: 100%; min-height: 110px; resize: vertical;
+  background: #fff; border: 1.5px solid var(--border); color: var(--text);
+  padding: 9px 11px; border-radius: 7px; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.5; transition: border-color .15s;
+}
+textarea.paste-box:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,0.08); }
+.parse-preview { display: flex; flex-direction: column; gap: 5px; max-height: 160px; overflow-y: auto; }
+.parse-row {
+  background: #fff; border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 10px; font-size: 0.72rem; font-family: var(--mono);
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+}
+.parse-row .pr-name { font-weight: 700; color: var(--text); flex: 1; }
+.parse-row .pr-slot { color: var(--accent2); font-weight: 700; }
+.parse-row .pr-venue { color: var(--text-muted); }
+.parse-row .pr-del { cursor: pointer; color: var(--accent3); font-weight: 700; padding: 0 4px; flex-shrink: 0; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo"><span class="vit">VIT-</span><span class="connect">FFCS</span></div>
+  <div class="nav-right">
+    <span class="nav-badge">FFCS Planner</span>
+    <span class="credit-badge" id="credit-display">Credits: 0 / 27</span>
+    <button class="btn btn-success btn-nav" onclick="downloadTimetable()">Download Timetable</button>
+    <button class="btn btn-danger btn-nav" onclick="eraseAll()">Erase All</button>
+  </div>
+</nav>
+
+<main>
+  <aside class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" id="tbtn-courses" onclick="switchTab('courses')">Courses</button>
+      <button class="tab-btn" id="tbtn-faculty" onclick="switchTab('faculty')">Faculty</button>
+      <button class="tab-btn" id="tbtn-selected" onclick="switchTab('selected')">Selected</button>
+    </div>
+
+    <!-- COURSES -->
+    <div class="tab-content active" id="tab-courses">
+      <div class="form-group">
+        <label>Course Code</label>
+        <input id="c-code" placeholder="e.g. ISWE103L" />
+      </div>
+      <div class="form-group">
+        <label>Course Title</label>
+        <input id="c-title" placeholder="e.g. Database System" />
+      </div>
+      <div class="two-col">
+        <div class="form-group">
+          <label>Credits</label>
+          <input id="c-credits" type="number" min="0.5" max="5" step="0.5" placeholder="3" />
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select id="c-type">
+            <option value="Theory">Theory (L)</option>
+            <option value="Lab">Lab (P)</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="addCourse()">Add Course</button>
+      <div class="divider"></div>
+      <div class="info-hint">Click a course to add faculty for it.</div>
+      <div class="list-wrap" id="course-list">
+        <div class="empty-state">No courses added yet</div>
+      </div>
+    </div>
+
+    <!-- FACULTY -->
+    <div class="tab-content" id="tab-faculty">
+      <div class="form-group">
+        <label>Course</label>
+        <select id="f-course"><option value="">-- Select Course --</option></select>
+      </div>
+      <div class="form-group">
+        <label>Faculty Name</label>
+        <input id="f-name" placeholder="e.g. Sivakumar M" />
+      </div>
+      <div class="two-col">
+        <div class="form-group">
+          <label>Slot</label>
+          <input id="f-slot" placeholder="e.g. A1+TA1" />
+        </div>
+        <div class="form-group">
+          <label>Venue</label>
+          <input id="f-venue" placeholder="e.g. SJT109" />
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="addFaculty()">Add Faculty</button>
+
+      <!-- PASTE PANEL -->
+      <div class="paste-panel">
+        <div class="paste-panel-head" onclick="togglePastePanel()">
+          <span class="paste-panel-title">Paste Multiple Faculty</span>
+          <span id="paste-arrow" style="font-size:0.8rem;color:var(--accent)">&#9660;</span>
+        </div>
+        <div class="paste-panel-body hidden" id="paste-panel-body">
+          <div class="form-group">
+            <label>Course (for pasted faculty)</label>
+            <select id="paste-course"><option value="">-- Select Course --</option></select>
+          </div>
+          <div class="form-group">
+            <label>Paste faculty text below</label>
+            <textarea class="paste-box" id="paste-box" placeholder="Paste any text containing faculty info. Each line or block with a name, slot (like A1+TA1 or L51+L52) and venue (like SJT109) will be parsed automatically.&#10;&#10;Example:&#10;SIVAKUMAR M  F1+TF1  SJT109&#10;JOTHISH KUMAR M  B1+TB1  SJT113&#10;THANDEESWARAN R (E)  A2+TA2  SJT112"></textarea>
+          </div>
+          <button class="btn btn-outline btn-block" style="font-size:0.8rem" onclick="parsePasteText()">Parse Text</button>
+          <div id="parse-preview" class="parse-preview"></div>
+          <button class="btn btn-success btn-block" id="paste-confirm-btn" style="display:none;font-size:0.82rem" onclick="confirmParsedFaculty()">Add All Parsed Faculty</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="info-hint">Radio button = register that faculty. Only one faculty per course can be active at a time.</div>
+      <div class="list-wrap" id="faculty-list">
+        <div class="empty-state">No faculty added yet</div>
+      </div>
+    </div>
+
+    <!-- SELECTED -->
+    <div class="tab-content" id="tab-selected">
+      <div class="info-hint">Your registered courses. Click Remove to deregister.</div>
+      <div class="list-wrap" id="selected-list">
+        <div class="empty-state">No selections yet</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <div id="alert-area"></div>
+
+    <!-- TIMETABLE -->
+    <div>
+      <div class="section-header">
+        <div class="section-title"><span class="s-bar"></span> Weekly Timetable</div>
+        <div class="tt-toggle">
+          <button class="tog-btn"        id="tog-morning"   onclick="setView('morning')">Theory Hours</button>
+          <button class="tog-btn"        id="tog-afternoon" onclick="setView('afternoon')">Lab Hours</button>
+          <button class="tog-btn active" id="tog-full"      onclick="setView('full')">Both</button>
+        </div>
+      </div>
+      <div class="tt-card">
+        <table class="tt-tbl" id="tt-tbl"></table>
+      </div>
+    </div>
+
+    <!-- REPORT -->
+    <div>
+      <div class="section-header">
+        <div class="section-title"><span class="s-bar" style="background:var(--accent2)"></span> Course Registration Report</div>
+        <span class="info-hint">Double-click a row to remove</span>
+      </div>
+      <div class="report-card">
+        <table class="report-tbl">
+          <thead>
+            <tr><th>Slot</th><th>Course Code</th><th>Course Title</th><th>Faculty</th><th>Venue</th><th>Credits</th><th></th></tr>
+          </thead>
+          <tbody id="report-body">
+            <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-muted);font-size:0.83rem;">Register courses by selecting a faculty radio button in the Faculty tab</td></tr>
+          </tbody>
+          <tfoot id="report-foot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-text">Made for <strong>VITian</strong>s &mdash; VIT-FFCS Planner.</div>
+  <a class="linkedin-btn" href="https://www.linkedin.com/in/nithesh-kumar-t-b4028130a/" target="_blank" rel="noopener">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.327-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+    </svg>
+    LinkedIn
+  </a>
+</footer>
+
+<script>
+// ====== SLOT DATA ======
+const DAYS = ['MON','TUE','WED','THU','FRI'];
+
+const TH_M = ['8:00 AM|to|8:50 AM','8:55 AM|to|9:45 AM','9:50 AM|to|10:40 AM','10:45 AM|to|11:35 AM','11:40 AM|to|12:30 PM','12:35 PM|to|1:25 PM'];
+const TH_A = ['2:00 PM|to|2:50 PM','2:55 PM|to|3:45 PM','3:50 PM|to|4:40 PM','4:45 PM|to|5:35 PM','5:40 PM|to|6:30 PM','6:35 PM|to|7:25 PM'];
+const LB_M = ['08:00 AM|to|08:50 AM','08:50 AM|to|09:40 AM','09:50 AM|to|10:40 AM','10:40 AM|to|11:30 AM','11:40 AM|to|12:30 PM','12:30 PM|to|1:20 PM'];
+const LB_A = ['2:00 PM|to|2:50 PM','2:50 PM|to|3:40 PM','3:50 PM|to|4:40 PM','4:40 PM|to|5:30 PM','5:40 PM|to|6:30 PM','6:30 PM|to|7:20 PM'];
+
+// col 0-5 morning, 6-11 afternoon
+const TH_GRID = [
+  ['A1','F1','D1','TB1','TG1','S11','A2','F2','D2','TB2','TG2','S3'],
+  ['B1','G1','E1','TC1','TAA1','','B2','G2','E2','TC2','TAA2','S1'],
+  ['C1','A1','F1','TD1','TBB1','','C2','A2','F2','TD2','TBB2','S4'],
+  ['D1','B1','G1','TE1','TCC1','','D2','B2','G2','TE2','TCC2','S2'],
+  ['E1','C1','TA1','TF1','TDD1','S15','E2','C2','TA2','TF2','TDD2',''],
+];
+const LB_GRID = [
+  ['L1','L2','L3','L4','L5','L6','L31','L32','L33','L34','L35','L36'],
+  ['L7','L8','L9','L10','L11','L12','L37','L38','L39','L40','L41','L42'],
+  ['L13','L14','L15','L16','L17','L18','L43','L44','L45','L46','L47','L48'],
+  ['L19','L20','L21','L22','L23','L24','L49','L50','L51','L52','L53','L54'],
+  ['L25','L26','L27','L28','L29','L30','L55','L56','L57','L58','L59','L60'],
+];
+
+const COLORS = ['#4f46e5','#059669','#d97706','#dc2626','#7c3aed','#0284c7','#be185d','#16a34a','#ea580c','#0891b2','#6d28d9','#b45309','#0369a1','#9333ea','#047857'];
+
+// ====== STATE ======
+let courses=[], faculties=[], selected=[], colorIdx=0, ttView='full';
+
+// ====== PERSIST ======
+function save() {
+  try {
+    localStorage.setItem('vc_c', JSON.stringify(courses));
+    localStorage.setItem('vc_f', JSON.stringify(faculties));
+    localStorage.setItem('vc_s', JSON.stringify(selected));
+    localStorage.setItem('vc_ci', String(colorIdx));
+  } catch(e){}
+}
+function load() {
+  try {
+    courses   = JSON.parse(localStorage.getItem('vc_c'))  || [];
+    faculties = JSON.parse(localStorage.getItem('vc_f'))  || [];
+    selected  = JSON.parse(localStorage.getItem('vc_s'))  || [];
+    colorIdx  = parseInt(localStorage.getItem('vc_ci'))   || 0;
+  } catch(e){ courses=[]; faculties=[]; selected=[]; colorIdx=0; }
+}
+
+// ====== TABS ======
+function switchTab(t) {
+  ['courses','faculty','selected'].forEach(x=>{
+    document.getElementById('tbtn-'+x).classList.toggle('active', x===t);
+    document.getElementById('tab-'+x).classList.toggle('active', x===t);
+  });
+  if(t==='faculty') syncFacSelect();
+}
+
+// ====== COURSES ======
+function addCourse() {
+  const code    = document.getElementById('c-code').value.trim().toUpperCase();
+  const title   = document.getElementById('c-title').value.trim();
+  const credits = parseFloat(document.getElementById('c-credits').value);
+  const type    = document.getElementById('c-type').value;
+  if(!code||!title||isNaN(credits)||credits<=0){ alert2('Fill all course fields.','error'); return; }
+  if(courses.find(c=>c.code===code)){ alert2('Course code already exists.','error'); return; }
+  courses.push({id:Date.now(), code, title, credits, type});
+  document.getElementById('c-code').value='';
+  document.getElementById('c-title').value='';
+  document.getElementById('c-credits').value='';
+  save(); renderCourses(); syncFacSelect();
+  alert2('Course added.','success');
+}
+function deleteCourse(id, e) {
+  e.stopPropagation();
+  if(!confirm('Remove course and all its faculty/selections?')) return;
+  courses=courses.filter(c=>c.id!==id);
+  faculties=faculties.filter(f=>f.courseId!==id);
+  selected=selected.filter(s=>s.courseId!==id);
+  save(); renderCourses(); renderFaculty(); renderSelected();
+  syncFacSelect(); renderTT(); renderReport(); updateCredits();
+}
+function renderCourses() {
+  const el=document.getElementById('course-list');
+  if(!courses.length){ el.innerHTML='<div class="empty-state">No courses added yet</div>'; return; }
+  el.innerHTML=courses.map(c=>`
+    <div class="course-item" onclick="jumpFac(${c.id})">
+      <div><div class="course-name">${c.title}</div><div class="course-meta">${c.code} &bull; ${c.type} &bull; ${c.credits} cr</div></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <span class="credit-pill">${c.credits}</span>
+        <button class="btn btn-danger btn-sm" onclick="deleteCourse(${c.id},event)">X</button>
+      </div>
+    </div>
+  `).join('');
+}
+function jumpFac(id){ switchTab('faculty'); syncFacSelect(); document.getElementById('f-course').value=id; }
+
+// ====== FACULTY ======
+function syncFacSelect() {
+  const opts='<option value="">-- Select Course --</option>'+courses.map(c=>`<option value="${c.id}">${c.code} - ${c.title}</option>`).join('');
+  ['f-course','paste-course'].forEach(id=>{
+    const el=document.getElementById(id);
+    const prev=el.value;
+    el.innerHTML=opts;
+    if(prev) el.value=prev;
+  });
+}
+
+// ====== PASTE FACULTY ======
+let parsedRows=[];
+
+function togglePastePanel() {
+  const body=document.getElementById('paste-panel-body');
+  const arrow=document.getElementById('paste-arrow');
+  const hidden=body.classList.toggle('hidden');
+  arrow.innerHTML=hidden?'&#9660;':'&#9650;';
+  if(!hidden) syncFacSelect();
+}
+
+function parsePasteText() {
+  const text=document.getElementById('paste-box').value;
+  if(!text.trim()){ alert2('Paste some text first.','error'); return; }
+
+  // Slot pattern: one or more slot tokens joined by +
+  // Slot token: letter(s) + digits (optionally with trailing letters like TA1, TG1, L51 etc)
+  const slotPattern = /\b([A-Z]{1,4}\d+(?:\+[A-Z]{1,4}\d+)+)\b/g;
+  // Venue pattern: letters+digits combination like SJT109, PRP449, MB101
+  const venuePattern = /\b([A-Z]{2,4}\d{2,4}[A-Z]?)\b/g;
+
+  // Split into lines / blocks; try line by line first, then fall back to whole-text chunking
+  const lines = text.split(/\n/).map(l=>l.trim()).filter(l=>l.length>2);
+
+  parsedRows=[];
+
+  for(const line of lines) {
+    // Find slot
+    const slotMatch = [...line.matchAll(/\b([A-Z]{1,4}\d+(?:\+[A-Z]{1,4}\d+)+)\b/g)];
+    if(!slotMatch.length) continue;
+    const slot = slotMatch[0][1];
+
+    // Find venue: alphanumeric token that looks like a venue (2-4 letters + 2-4 digits)
+    const venueMatch = [...line.matchAll(/\b([A-Z]{2,4}\d{2,4}[A-Z]?\d?)\b/g)]
+      .filter(m=>m[1]!==slot && !m[1].match(/^\d/));
+    const venue = venueMatch.length ? venueMatch[venueMatch.length-1][1] : '';
+
+    // Name: remove slot, venue, and common noise tokens; what remains is the name
+    let nameStr = line;
+    // Remove the slot
+    nameStr = nameStr.replace(slot, '');
+    // Remove venue
+    if(venue) nameStr = nameStr.replace(new RegExp('\\b'+venue+'\\b'), '');
+    // Remove stray serial numbers at start (e.g. "1.", "2)", digits only)
+    nameStr = nameStr.replace(/^\s*\d+[\.\)]\s*/, '');
+    // Remove tabs and extra spaces
+    nameStr = nameStr.replace(/\s{2,}/g,' ').trim();
+    // Clean trailing/leading punctuation
+    nameStr = nameStr.replace(/^[\s\-\|,]+|[\s\-\|,]+$/g,'').trim();
+
+    if(!nameStr || nameStr.length < 2) continue;
+
+    parsedRows.push({name:nameStr, slot, venue});
+  }
+
+  renderParsePreview();
+}
+
+function renderParsePreview() {
+  const el=document.getElementById('parse-preview');
+  const btn=document.getElementById('paste-confirm-btn');
+  if(!parsedRows.length){
+    el.innerHTML='<div style="font-size:0.75rem;color:var(--accent3);padding:4px">No faculty found. Try formatting each faculty on its own line with: Name  Slot  Venue</div>';
+    btn.style.display='none'; return;
+  }
+  el.innerHTML=parsedRows.map((r,i)=>`
+    <div class="parse-row">
+      <span class="pr-name">${r.name}</span>
+      <span class="pr-slot">${r.slot}</span>
+      <span class="pr-venue">${r.venue||'?'}</span>
+      <span class="pr-del" onclick="removeParsedRow(${i})" title="Remove">X</span>
+    </div>
+  `).join('');
+  btn.style.display='flex';
+}
+
+function removeParsedRow(i) {
+  parsedRows.splice(i,1);
+  renderParsePreview();
+}
+
+function confirmParsedFaculty() {
+  const courseId=parseInt(document.getElementById('paste-course').value);
+  if(!courseId){ alert2('Select a course for these faculty.','error'); return; }
+  let added=0, skipped=0;
+  for(const r of parsedRows) {
+    if(!r.name||!r.slot){ skipped++; continue; }
+    const slotParts=r.slot.split('+').map(s=>s.trim()).filter(Boolean);
+    const venue=r.venue||'TBA';
+    faculties.push({id:Date.now()+Math.random(), courseId, name:r.name, slot:r.slot, slotParts, venue});
+    added++;
+  }
+  save(); renderFaculty();
+  document.getElementById('paste-box').value='';
+  document.getElementById('parse-preview').innerHTML='';
+  document.getElementById('paste-confirm-btn').style.display='none';
+  parsedRows=[];
+  alert2(`Added ${added} faculty${skipped?' ('+skipped+' skipped)':''}.`,'success');
+}
+function addFaculty() {
+  const courseId=parseInt(document.getElementById('f-course').value);
+  const name  =document.getElementById('f-name').value.trim();   // case-sensitive
+  const slotRaw=document.getElementById('f-slot').value.trim().toUpperCase();
+  const venue =document.getElementById('f-venue').value.trim().toUpperCase();
+  if(!courseId||!name||!slotRaw||!venue){ alert2('Fill all faculty fields.','error'); return; }
+  const slotParts=slotRaw.split('+').map(s=>s.trim()).filter(Boolean);
+  if(!slotParts.length){ alert2('Invalid slot. Use format like A1+TA1.','error'); return; }
+  faculties.push({id:Date.now(), courseId, name, slot:slotRaw, slotParts, venue});
+  document.getElementById('f-name').value='';
+  document.getElementById('f-slot').value='';
+  document.getElementById('f-venue').value='';
+  save(); renderFaculty();
+  alert2('Faculty added.','success');
+}
+function deleteFaculty(id, e) {
+  e.stopPropagation();
+  faculties=faculties.filter(f=>f.id!==id);
+  selected=selected.filter(s=>s.facultyId!==id);
+  save(); renderFaculty(); renderSelected(); renderTT(); renderReport(); updateCredits();
+}
+function selectFaculty(fid) {
+  const fac=faculties.find(f=>f.id===fid);
+  if(!fac) return;
+  const course=courses.find(c=>c.id===fac.courseId);
+  if(!course) return;
+  const existing=selected.find(s=>s.courseId===course.id);
+  if(existing && existing.facultyId===fid) return;
+
+  // Credit check
+  const currentCr=selected.filter(s=>s.courseId!==course.id).reduce((sum,s)=>{
+    const c=courses.find(x=>x.id===s.courseId); return sum+(c?c.credits:0);
+  },0);
+  if(currentCr+course.credits>27){ alert2('Adding this would exceed the 27 credit limit.','error'); return; }
+
+  // Clash check (against slots not belonging to same course)
+  for(const s of selected) {
+    if(s.courseId===course.id) continue;
+    for(const p of fac.slotParts) {
+      if(s.slotParts.includes(p)){ alert2('Slot clash on "'+p+'" with '+s.courseCode+'.','error'); return; }
+    }
+  }
+
+  // Remove existing selection for same course if switching
+  selected=selected.filter(s=>s.courseId!==course.id);
+
+  const color=COLORS[colorIdx%COLORS.length];
+  colorIdx++;
+  selected.push({
+    courseId:course.id, facultyId:fac.id,
+    courseCode:course.code, courseName:course.title,
+    credits:course.credits,
+    facultyName:fac.name, slot:fac.slot, slotParts:fac.slotParts,
+    venue:fac.venue, color
+  });
+  save(); renderFaculty(); renderSelected(); renderTT(); renderReport(); updateCredits();
+  alert2(course.code+' registered with '+fac.name+'.','success');
+}
+function renderFaculty() {
+  const el=document.getElementById('faculty-list');
+  if(!faculties.length){ el.innerHTML='<div class="empty-state">No faculty added yet</div>'; return; }
+  // Group by course
+  const groups={};
+  for(const f of faculties){ if(!groups[f.courseId]) groups[f.courseId]=[]; groups[f.courseId].push(f); }
+  let html='';
+  for(const [cid,facs] of Object.entries(groups)) {
+    const course=courses.find(c=>c.id===parseInt(cid));
+    if(!course) continue;
+    const selCourse=selected.find(s=>s.courseId===parseInt(cid));
+    html+=`<div class="faculty-group">
+      <div class="faculty-group-head">
+        <div>
+          <div class="faculty-group-title">${course.title}</div>
+          <div class="faculty-group-sub"><span style="font-family:var(--mono);color:var(--accent);font-weight:700">${course.code}</span> &bull; ${course.credits} cr &bull; ${course.type}</div>
+        </div>
+      </div>
+      <div class="faculty-rows">${facs.map(f=>{
+        const isSel=selCourse&&selCourse.facultyId===f.id;
+        return `<div class="faculty-row${isSel?' is-selected':''}" onclick="selectFaculty(${f.id})">
+          <input type="radio" class="fac-radio" name="fg_${cid}" ${isSel?'checked':''} onclick="event.stopPropagation();selectFaculty(${f.id})">
+          <div class="fac-info">
+            <div class="fac-name">${f.name}</div>
+            <div class="fac-meta">${f.venue} &bull; <span class="fac-slot">${f.slot}</span></div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="deleteFaculty(${f.id},event)">X</button>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }
+  el.innerHTML=html;
+}
+
+// ====== SELECTED ======
+function removeSelected(courseId) {
+  selected=selected.filter(s=>s.courseId!==courseId);
+  colorIdx=Math.max(0,colorIdx-1);
+  save(); renderFaculty(); renderSelected(); renderTT(); renderReport(); updateCredits();
+}
+function renderSelected() {
+  const el=document.getElementById('selected-list');
+  if(!selected.length){ el.innerHTML='<div class="empty-state">No selections yet</div>'; return; }
+  el.innerHTML=selected.map(s=>`
+    <div class="selected-item" style="border-left-color:${s.color}">
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:0.83rem">${s.courseCode}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${s.courseName}</div>
+        <div style="font-size:0.71rem;font-family:var(--mono);color:${s.color};margin-top:3px">${s.slot} &bull; ${s.venue}</div>
+        <div style="font-size:0.71rem;color:var(--text-muted);margin-top:1px">${s.facultyName}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+        <span style="font-family:var(--mono);font-size:0.71rem;color:var(--text-muted)">${s.credits} cr</span>
+        <button class="btn btn-danger btn-sm" onclick="removeSelected(${s.courseId})">Remove</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ====== TIMETABLE ======
+function setView(v) {
+  ttView=v;
+  ['morning','afternoon','full'].forEach(x=>document.getElementById('tog-'+x).classList.toggle('active',x===v));
+  renderTT();
+}
+function selForSlot(s){ if(!s) return null; return selected.find(x=>x.slotParts.includes(s))||null; }
+
+function renderTT() {
+  // Always render BOTH header rows (Theory Hours + Lab Hours) stacked, exactly like the reference images.
+  // The toggle controls which *columns* are visible:
+  //   "Theory Hours" = show morning+afternoon theory times (cols 0-11, row 1 prominent)
+  //   "Lab Hours"    = show morning+afternoon lab times    (cols 0-11, row 2 prominent)
+  //   "Both"         = show both rows exactly as reference (DEFAULT recommended)
+  // Since the reference always shows both rows, we always render both.
+  const tbl=document.getElementById('tt-tbl');
+
+  // ---- HEADER ROW 1: THEORY HOURS ----
+  let th1=`<tr>`;
+  th1+=`<th class="type-th" style="background:#5b72ee;color:#fff;vertical-align:middle">THEORY<br>HOURS</th>`;
+  // Morning theory cols 0-5
+  for(let c=0;c<6;c++){
+    const p=TH_M[c].split('|');
+    th1+=`<th class="time-th" style="background:#dce3fb;color:#3730a3">${p[0]}<br><span style="font-weight:400;color:#6b7280">${p[1]}</span><br>${p[2]}</th>`;
+  }
+  // Lunch (rowspan 2 to cover both header rows)
+  th1+=`<th class="lunch-th" rowspan="2" style="background:#c8cdd8;vertical-align:middle"><span class="lunch-lbl">L<br>U<br>N<br>C<br>H</span></th>`;
+  // Afternoon theory cols 6-11
+  for(let c=6;c<12;c++){
+    const p=TH_A[c-6].split('|');
+    th1+=`<th class="time-th" style="background:#e0e7ff;color:#3730a3">${p[0]}<br><span style="font-weight:400;color:#6b7280">${p[1]}</span><br>${p[2]}</th>`;
+  }
+  th1+=`</tr>`;
+
+  // ---- HEADER ROW 2: LAB HOURS ----
+  let th2=`<tr>`;
+  th2+=`<th class="type-th" style="background:#5b9bd5;color:#fff;vertical-align:middle">LAB<br>HOURS</th>`;
+  // Morning lab cols 0-5
+  for(let c=0;c<6;c++){
+    const p=LB_M[c].split('|');
+    th2+=`<th class="time-th" style="background:#dbeafe;color:#1d4ed8">${p[0]}<br><span style="font-weight:400;color:#6b7280">${p[1]}</span><br>${p[2]}</th>`;
+  }
+  // Afternoon lab cols 6-11
+  for(let c=6;c<12;c++){
+    const p=LB_A[c-6].split('|');
+    th2+=`<th class="time-th" style="background:#eff6ff;color:#1d4ed8">${p[0]}<br><span style="font-weight:400;color:#6b7280">${p[1]}</span><br>${p[2]}</th>`;
+  }
+  th2+=`</tr>`;
+
+  // ---- DATA ROWS ----
+  let rows='';
+  for(let d=0;d<5;d++){
+    let row=`<tr><td class="day-th">${DAYS[d]}</td>`;
+    for(let c=0;c<12;c++){
+      // Insert lunch column between col 5 and col 6
+      if(c===6) row+=`<td style="background:#c8cdd8;width:22px;text-align:center;vertical-align:middle;border:1px solid #b0b5c0"></td>`;
+      const ts=TH_GRID[d][c];
+      const ls=LB_GRID[d][c];
+      const sel=selForSlot(ts)||selForSlot(ls);
+      const bg  = sel ? sel.color+'22' : (c<6 ? '#f9fbf9' : '#f9fbff');
+      const bd  = sel ? `border:1.5px solid ${sel.color}` : '';
+      const rc  = sel ? `onclick="removeSelected(${sel.courseId})" title="Click to remove ${sel.courseCode}"` : '';
+      row+=`<td class="slot-cell" style="background:${bg};${bd}" ${rc}>`;
+      // Show theory/lab slot codes
+      const slotLabel = ts && ls ? `${ts} / ${ls}` : (ts||ls||'');
+      row+=`<span class="s-code">${slotLabel}</span>`;
+      if(sel){
+        row+=`<span class="s-name" style="color:${sel.color}">${sel.courseCode}</span>`;
+        row+=`<span class="s-venue">${sel.venue}</span>`;
+      }
+      row+=`</td>`;
+    }
+    row+=`</tr>`;
+    rows+=row;
+  }
+
+  tbl.innerHTML=`<thead>${th1}${th2}</thead><tbody>${rows}</tbody>`;
+}
+
+// ====== REPORT ======
+function renderReport() {
+  const tbody=document.getElementById('report-body');
+  const tfoot=document.getElementById('report-foot');
+  if(!selected.length) {
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-muted);font-size:0.83rem">Register courses by selecting a faculty radio button in the Faculty tab</td></tr>';
+    tfoot.innerHTML=''; return;
+  }
+  tbody.innerHTML=selected.map(s=>`
+    <tr ondblclick="removeSelected(${s.courseId})" title="Double-click to remove" style="cursor:pointer">
+      <td><code style="color:var(--accent2);font-family:var(--mono);font-size:0.79rem">${s.slot}</code></td>
+      <td><code style="color:var(--accent);font-family:var(--mono);font-size:0.79rem">${s.courseCode}</code></td>
+      <td>${s.courseName}</td>
+      <td>${s.facultyName}</td>
+      <td><code style="font-family:var(--mono);font-size:0.77rem">${s.venue}</code></td>
+      <td style="text-align:center;font-family:var(--mono);font-weight:700">${s.credits}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeSelected(${s.courseId})">X</button></td>
+    </tr>
+  `).join('');
+  const total=selected.reduce((a,s)=>a+s.credits,0);
+  tfoot.innerHTML=`<tr class="report-total"><td colspan="5" style="text-align:right;padding:12px 14px;font-size:0.8rem;color:var(--text-muted)">Total Credits</td><td style="text-align:center;font-size:1rem;padding:12px 14px">${total}</td><td></td></tr>`;
+}
+
+// ====== CREDITS ======
+function updateCredits() {
+  const total=selected.reduce((a,s)=>a+s.credits,0);
+  const el=document.getElementById('credit-display');
+  el.textContent=`Credits: ${total} / 27`;
+  el.className='credit-badge'+(total>27?' over':total>=20?' warn':'');
+}
+
+// ====== ALERTS ======
+let alertTimer=null;
+function alert2(msg,type='info') {
+  const el=document.getElementById('alert-area');
+  el.innerHTML=`<div class="alert alert-${type}">${msg}</div>`;
+  if(alertTimer) clearTimeout(alertTimer);
+  alertTimer=setTimeout(()=>{ el.innerHTML=''; },3500);
+}
+
+// ====== DOWNLOAD ======
+function downloadTimetable() {
+  const total=selected.reduce((a,s)=>a+s.credits,0);
+
+  function ttHtml() {
+    let h=`<table style="border-collapse:collapse;width:100%;font-family:Sora,sans-serif;font-size:11px">`;
+    // Row 1: Theory Hours
+    h+=`<tr><th style="background:#5b72ee;color:#fff;padding:7px;min-width:52px;vertical-align:middle">THEORY<br>HOURS</th>`;
+    for(let c=0;c<6;c++){ const p=TH_M[c].split('|'); h+=`<th style="background:#dce3fb;color:#3730a3;padding:6px;min-width:88px">${p[0]} ${p[1]} ${p[2]}</th>`; }
+    h+=`<th style="background:#c8cdd8;width:20px;font-size:9px;color:#555;text-align:center;vertical-align:middle" rowspan="2">L<br>U<br>N<br>C<br>H</th>`;
+    for(let c=0;c<6;c++){ const p=TH_A[c].split('|'); h+=`<th style="background:#e0e7ff;color:#3730a3;padding:6px;min-width:88px">${p[0]} ${p[1]} ${p[2]}</th>`; }
+    h+=`</tr>`;
+    // Row 2: Lab Hours
+    h+=`<tr><th style="background:#5b9bd5;color:#fff;padding:7px;vertical-align:middle">LAB<br>HOURS</th>`;
+    for(let c=0;c<6;c++){ const p=LB_M[c].split('|'); h+=`<th style="background:#dbeafe;color:#1d4ed8;padding:6px">${p[0]} ${p[1]} ${p[2]}</th>`; }
+    for(let c=0;c<6;c++){ const p=LB_A[c].split('|'); h+=`<th style="background:#eff6ff;color:#1d4ed8;padding:6px">${p[0]} ${p[1]} ${p[2]}</th>`; }
+    h+=`</tr>`;
+    // Data rows
+    for(let d=0;d<5;d++) {
+      h+=`<tr><td style="font-weight:800;color:#4f46e5;background:#f0f2f8;padding:8px;font-size:12px;text-align:center">${DAYS[d]}</td>`;
+      for(let c=0;c<12;c++) {
+        if(c===6) h+=`<td style="background:#c8cdd8;width:20px;border:1px solid #b0b5c0"></td>`;
+        const ts=TH_GRID[d][c], ls=LB_GRID[d][c];
+        const sel=selForSlot(ts)||selForSlot(ls);
+        const slotLabel = ts&&ls ? `${ts} / ${ls}` : (ts||ls||'');
+        const bg=sel?sel.color+'22':(c<6?'#f9fbf9':'#f9fbff');
+        const bd=sel?`border:1.5px solid ${sel.color}`:'border:1px solid #dde1ef';
+        h+=`<td style="background:${bg};${bd};padding:4px;text-align:center;vertical-align:middle;height:56px">`;
+        h+=`<span style="color:#b0b5c5;display:block;font-size:9px;font-family:monospace">${slotLabel}</span>`;
+        if(sel) h+=`<span style="font-weight:700;color:${sel.color};display:block;font-size:11px">${sel.courseCode}</span><span style="color:#6b7280;font-size:9px;display:block">${sel.venue}</span>`;
+        h+=`</td>`;
+      }
+      h+=`</tr>`;
+    }
+    h+=`</table>`;
+    return h;
+  }
+
+  function reportHtml() {
+    if(!selected.length) return '<p style="color:#6b7280">No courses registered.</p>';
+    const rows=selected.map(s=>`<tr>
+      <td style="padding:10px 13px;border-bottom:1px solid #dde1ef;font-family:monospace;color:#059669">${s.slot}</td>
+      <td style="padding:10px 13px;border-bottom:1px solid #dde1ef;font-family:monospace;color:#4f46e5">${s.courseCode}</td>
+      <td style="padding:10px 13px;border-bottom:1px solid #dde1ef">${s.courseName}</td>
+      <td style="padding:10px 13px;border-bottom:1px solid #dde1ef">${s.facultyName}</td>
+      <td style="padding:10px 13px;border-bottom:1px solid #dde1ef;font-family:monospace">${s.venue}</td>
+      <td style="padding:10px 13px;border-bottom:1px solid #dde1ef;text-align:center;font-weight:700">${s.credits}</td>
+    </tr>`).join('');
+    return `<table style="border-collapse:collapse;width:100%;font-family:Sora,sans-serif">
+      <thead><tr style="background:#f0f2f8;border-bottom:2px solid #4f46e5">
+        <th style="padding:10px 13px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase">Slot</th>
+        <th style="padding:10px 13px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase">Code</th>
+        <th style="padding:10px 13px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase">Course Title</th>
+        <th style="padding:10px 13px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase">Faculty</th>
+        <th style="padding:10px 13px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase">Venue</th>
+        <th style="padding:10px 13px;text-align:center;font-size:11px;color:#6b7280;text-transform:uppercase">Credits</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="background:#f0f2f8">
+        <td colspan="5" style="padding:11px 13px;text-align:right;font-weight:700;color:#6b7280">Total Credits</td>
+        <td style="padding:11px 13px;text-align:center;font-weight:800;color:#059669;font-size:1rem">${total}</td>
+      </tr></tfoot>
+    </table>`;
+  }
+
+  const html=`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>VIT-FFCS Timetable</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>body{font-family:Sora,sans-serif;background:#f4f6fb;color:#1e1f2e;padding:28px;max-width:1200px;margin:0 auto}
+h1{font-size:1.9rem;font-weight:800;margin-bottom:4px}.vit{color:#1e1f2e}.connect{color:#4f46e5}
+h2{font-size:1rem;font-weight:800;margin:26px 0 10px;color:#4f46e5;border-left:3px solid #4f46e5;padding-left:10px}
+.sub{color:#6b7280;font-size:0.82rem;margin-bottom:24px}
+@media print{body{padding:10px}}</style></head>
+<body>
+<h1><span class="vit">VIT-</span><span class="connect">FFCS</span></h1>
+<div class="sub">FFCS Timetable &mdash; ${new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
+<h2>Weekly Timetable</h2>${ttHtml()}
+<h2>Course Registration Report</h2>${reportHtml()}
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='VIT-FFCS_Timetable.html';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },1200);
+}
+
+// ====== ERASE ======
+function eraseAll() {
+  if(!confirm('This will erase ALL data. Continue?')) return;
+  courses=[]; faculties=[]; selected=[]; colorIdx=0;
+  ['vc_c','vc_f','vc_s','vc_ci'].forEach(k=>localStorage.removeItem(k));
+  renderCourses(); renderFaculty(); renderSelected(); syncFacSelect();
+  renderTT(); renderReport(); updateCredits();
+  alert2('All data erased.','info');
+}
+
+// ====== INIT ======
+load();
+renderCourses(); renderFaculty(); renderSelected(); syncFacSelect();
+renderTT(); renderReport(); updateCredits();
+</script>
+</body>
+</html>
