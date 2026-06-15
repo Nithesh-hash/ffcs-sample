@@ -80,6 +80,8 @@ select option { background: #fff; }
 .btn-success:hover { background: #047857; transform: translateY(-1px); }
 .btn-danger { background: var(--accent3); color: #fff; }
 .btn-danger:hover { background: #b91c1c; }
+.btn-edit { background: #f59e0b; color: #fff; }
+.btn-edit:hover { background: #d97706; }
 .btn-sm { padding: 4px 10px; font-size: 0.73rem; border-radius: 5px; }
 .btn-block { width: 100%; justify-content: center; }
 .btn-nav { padding: 7px 15px; font-size: 0.8rem; }
@@ -177,6 +179,19 @@ select option { background: #fff; }
 .alert-success { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
 .alert-info { background: var(--accent-light); border: 1px solid #a5b4fc; color: var(--accent); }
 
+/* EDIT MODAL */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(30,31,46,0.45);
+  z-index: 200; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: #fff; border-radius: 12px; padding: 24px; width: 360px;
+  box-shadow: 0 8px 32px rgba(79,70,229,0.18); display: flex; flex-direction: column; gap: 14px;
+}
+.modal-title { font-size: 1rem; font-weight: 800; color: var(--accent); margin-bottom: 2px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
 footer {
   background: #fff; border-top: 1.5px solid var(--border);
   padding: 12px 28px; display: flex; align-items: center; justify-content: space-between;
@@ -223,10 +238,6 @@ textarea.paste-box:focus { outline: none; border-color: var(--accent); box-shado
 .parse-row .pr-slot { color: var(--accent2); font-weight: 700; }
 .parse-row .pr-venue { color: var(--text-muted); }
 .parse-row .pr-del { cursor: pointer; color: var(--accent3); font-weight: 700; padding: 0 4px; flex-shrink: 0; }
-
-
-
-
 </style>
 </head>
 <body>
@@ -321,7 +332,7 @@ textarea.paste-box:focus { outline: none; border-color: var(--accent); box-shado
       </div>
 
       <div class="divider"></div>
-      <div class="info-hint">Radio button = register that faculty. Only one faculty per course can be active at a time.</div>
+      <div class="info-hint">Radio button = register that faculty. Click a selected radio again to unselect. Use Edit to modify faculty details.</div>
       <div class="list-wrap" id="faculty-list">
         <div class="empty-state">No faculty added yet</div>
       </div>
@@ -383,30 +394,46 @@ textarea.paste-box:focus { outline: none; border-color: var(--accent); box-shado
   </a>
 </footer>
 
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">Edit Faculty</div>
+    <input type="hidden" id="edit-fid" />
+    <div class="form-group">
+      <label>Faculty Name</label>
+      <input id="edit-name" placeholder="e.g. Sivakumar M" />
+    </div>
+    <div class="two-col">
+      <div class="form-group">
+        <label>Slot</label>
+        <input id="edit-slot" placeholder="e.g. A1+TA1" />
+      </div>
+      <div class="form-group">
+        <label>Venue</label>
+        <input id="edit-venue" placeholder="e.g. SJT109" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="background:var(--surface2);color:var(--text-muted)" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditFaculty()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ====== SLOT DATA ======
 const DAYS = ['MON','TUE','WED','THU','FRI'];
 
-// MORNING: Theory 8:00AM–12:50PM (cols 0-5), Lab 2:00PM–7:20PM (cols 6-11)
-// AFTERNOON: Theory 2:00PM–7:50PM (cols 0-5 reused), Lab 8:00AM–1:20PM (cols 6-11 reused)
-
-// Morning Theory (col 0-5): 8:00–8:50, 9:00–9:50, 10:00–10:50, 11:00–11:50, 12:00–12:50, [col5 = S11/S15 special]
 const TH_MORNING = ['8:00 AM|to|8:50 AM','9:00 AM|to|9:50 AM','10:00 AM|to|10:50 AM','11:00 AM|to|11:50 AM','12:00 PM|to|12:50 PM','12:00 PM|to|12:50 PM'];
-// Morning Lab (col 6-11): 2:00–2:50, 2:51–3:40, 3:51–4:40, 4:41–5:30, 5:40–6:30, 6:31–7:20
 const LB_MORNING = ['2:00 PM|to|2:50 PM','2:51 PM|to|3:40 PM','3:51 PM|to|4:40 PM','4:41 PM|to|5:30 PM','5:40 PM|to|6:30 PM','6:31 PM|to|7:20 PM'];
-
-// Afternoon Theory (col 0-5): 2:00–2:50, 3:00–3:50, 4:00–4:50, 5:00–5:50, 6:00–6:50, 7:01–7:50
 const TH_AFTERNOON = ['2:00 PM|to|2:50 PM','3:00 PM|to|3:50 PM','4:00 PM|to|4:50 PM','5:00 PM|to|5:50 PM','6:00 PM|to|6:50 PM','7:01 PM|to|7:50 PM'];
-// Afternoon Lab (col 6-11): 8:00–8:50, 8:51–9:40, 9:51–10:40, 10:41–11:30, 11:40–12:30, 12:31–1:20
 const LB_AFTERNOON = ['8:00 AM|to|8:50 AM','8:51 AM|to|9:40 AM','9:51 AM|to|10:40 AM','10:41 AM|to|11:30 AM','11:40 AM|to|12:30 PM','12:31 PM|to|1:20 PM'];
 
-// Keep old arrays as aliases so download function still works
 const TH_M = TH_MORNING;
 const TH_A = TH_AFTERNOON;
 const LB_M = LB_MORNING;
 const LB_A = LB_AFTERNOON;
 
-// col 0-5 morning, 6-11 afternoon
 const TH_GRID = [
   ['A1','F1','D1','TB1','TG1','S11','A2','F2','D2','TB2','TG2','S3'],
   ['B1','G1','E1','TC1','TAA1','','B2','G2','E2','TC2','TAA2','S1'],
@@ -537,44 +564,21 @@ function parsePasteText() {
 function extractFacultyFromText(text) {
   const lines=text.split(/\n/).map(l=>l.trim()).filter(l=>l.length>2);
   const result=[];
-
-  // Known slot pattern: optional T/TA/TB prefix + letter(s) + digit(s), optionally joined by +
-  // Handles: A1, B2, F1, G1, L51, TA1, TB1, TG1, A1+TA1, L51+L52, F1+TF1 etc.
   const SLOT_RE = /\b((?:T[A-Z]{0,2})?\b[A-Z]{1,3}\d{1,2}(?:\+(?:T[A-Z]{0,2})?[A-Z]{1,3}\d{1,2})*)\b/g;
-
-  // Venue pattern: 2-5 uppercase letters followed by 2-4 digits, optionally trailing letter+digit
-  // Handles: SJT109, PRP238, PRP238A, PRPG34, MB101, TT401 etc.
   const VENUE_RE = /\b([A-Z]{2,5}\d{1,4}[A-Z]?\d?)\b/g;
-
   for(const line of lines) {
-    // Uppercase the line for matching, but keep original for name extraction
     const upper = line.toUpperCase();
-
-    // Find all slot candidates
     const slotMatches = [...upper.matchAll(SLOT_RE)].map(m=>m[1]);
     if(!slotMatches.length) continue;
-
-    // Pick the slot: prefer compound slots (with +), else first single slot
     const slot = slotMatches.find(s=>s.includes('+')) || slotMatches[0];
-
-    // Find venue: last token that looks like a venue and isn't the slot
-    const venueMatches = [...upper.matchAll(VENUE_RE)]
-      .map(m=>m[1])
-      .filter(v => v !== slot && !slotMatches.includes(v));
+    const venueMatches = [...upper.matchAll(VENUE_RE)].map(m=>m[1]).filter(v => v !== slot && !slotMatches.includes(v));
     const venue = venueMatches.length ? venueMatches[venueMatches.length-1] : '';
-
-    // Extract name: remove slot, venue, leading serial numbers from original line
     let name = line;
-    // Remove slot (case-insensitive)
     name = name.replace(new RegExp(slot.replace(/\+/g,'\\+'),'i'), '');
-    // Remove venue
     if(venue) name = name.replace(new RegExp('\\b'+venue+'\\b','i'), '');
-    // Remove leading serial: "1." "2)" "3 " etc
     name = name.replace(/^\s*\d+[\.\)\-\s]\s*/,'');
-    // Collapse spaces and trim punctuation
     name = name.replace(/\s{2,}/g,' ').trim();
     name = name.replace(/^[\s\-\|,;:]+|[\s\-\|,;:]+$/g,'').trim();
-
     if(!name || name.length < 2) continue;
     result.push({name, slot, venue});
   }
@@ -620,7 +624,7 @@ function confirmParsedFaculty() {
 
 function addFaculty() {
   const courseId=parseInt(document.getElementById('f-course').value);
-  const name  =document.getElementById('f-name').value.trim();   // case-sensitive
+  const name  =document.getElementById('f-name').value.trim();
   const slotRaw=document.getElementById('f-slot').value.trim().toUpperCase();
   const venue =document.getElementById('f-venue').value.trim().toUpperCase();
   if(!courseId||!name||!slotRaw||!venue){ alert2('Fill all faculty fields.','error'); return; }
@@ -633,19 +637,23 @@ function addFaculty() {
   save(); renderFaculty();
   alert2('Faculty added.','success');
 }
-function deleteFaculty(id, e) {
-  e.stopPropagation();
-  faculties=faculties.filter(f=>f.id!==id);
-  selected=selected.filter(s=>s.facultyId!==id);
-  save(); renderFaculty(); renderSelected(); renderTT(); renderReport(); updateCredits();
-}
-function selectFaculty(fid) {
+
+// ====== UNSELECT FACULTY ======
+function toggleFaculty(fid) {
   const fac=faculties.find(f=>f.id===fid);
   if(!fac) return;
   const course=courses.find(c=>c.id===fac.courseId);
   if(!course) return;
   const existing=selected.find(s=>s.courseId===course.id);
-  if(existing && existing.facultyId===fid) return;
+
+  // If already selected → unselect
+  if(existing && existing.facultyId===fid) {
+    selected=selected.filter(s=>s.courseId!==course.id);
+    colorIdx=Math.max(0,colorIdx-1);
+    save(); renderFaculty(); renderSelected(); renderTT(); renderReport(); updateCredits();
+    alert2(course.code+' unregistered.','info');
+    return;
+  }
 
   // Credit check
   const currentCr=selected.filter(s=>s.courseId!==course.id).reduce((sum,s)=>{
@@ -653,7 +661,7 @@ function selectFaculty(fid) {
   },0);
   if(currentCr+course.credits>27){ alert2('Adding this would exceed the 27 credit limit.','error'); return; }
 
-  // Clash check (against slots not belonging to same course)
+  // Clash check
   for(const s of selected) {
     if(s.courseId===course.id) continue;
     for(const p of fac.slotParts) {
@@ -662,10 +670,11 @@ function selectFaculty(fid) {
   }
 
   // Remove existing selection for same course if switching
+  const wasSelected = selected.find(s=>s.courseId===course.id);
+  if(!wasSelected) colorIdx++;
   selected=selected.filter(s=>s.courseId!==course.id);
 
-  const color=COLORS[colorIdx%COLORS.length];
-  colorIdx++;
+  const color=COLORS[(colorIdx-1)%COLORS.length];
   selected.push({
     courseId:course.id, facultyId:fac.id,
     courseCode:course.code, courseName:course.title,
@@ -676,10 +685,51 @@ function selectFaculty(fid) {
   save(); renderFaculty(); renderSelected(); renderTT(); renderReport(); updateCredits();
   alert2(course.code+' registered with '+fac.name+'.','success');
 }
+
+// ====== EDIT FACULTY MODAL ======
+function openEditModal(fid, e) {
+  e.stopPropagation();
+  const fac=faculties.find(f=>f.id===fid);
+  if(!fac) return;
+  document.getElementById('edit-fid').value=fid;
+  document.getElementById('edit-name').value=fac.name;
+  document.getElementById('edit-slot').value=fac.slot;
+  document.getElementById('edit-venue').value=fac.venue;
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+function saveEditFaculty() {
+  const fid=parseInt(document.getElementById('edit-fid').value);
+  const name=document.getElementById('edit-name').value.trim();
+  const slotRaw=document.getElementById('edit-slot').value.trim().toUpperCase();
+  const venue=document.getElementById('edit-venue').value.trim().toUpperCase();
+  if(!name||!slotRaw||!venue){ alert2('Fill all fields.','error'); return; }
+  const slotParts=slotRaw.split('+').map(s=>s.trim()).filter(Boolean);
+  const idx=faculties.findIndex(f=>f.id===fid);
+  if(idx===-1){ alert2('Faculty not found.','error'); return; }
+  faculties[idx]={...faculties[idx], name, slot:slotRaw, slotParts, venue};
+  // Update selected if this faculty is currently selected
+  const selIdx=selected.findIndex(s=>s.facultyId===fid);
+  if(selIdx!==-1){
+    selected[selIdx]={...selected[selIdx], facultyName:name, slot:slotRaw, slotParts, venue};
+  }
+  save(); renderFaculty(); renderSelected(); renderTT(); renderReport();
+  closeEditModal();
+  alert2('Faculty updated.','success');
+}
+
+// Close modal on overlay click
+document.getElementById('edit-modal').addEventListener('click', function(e){
+  if(e.target===this) closeEditModal();
+});
+
 function renderFaculty() {
   const el=document.getElementById('faculty-list');
   if(!faculties.length){ el.innerHTML='<div class="empty-state">No faculty added yet</div>'; return; }
-  // Group by course
   const groups={};
   for(const f of faculties){ if(!groups[f.courseId]) groups[f.courseId]=[]; groups[f.courseId].push(f); }
   let html='';
@@ -696,13 +746,13 @@ function renderFaculty() {
       </div>
       <div class="faculty-rows">${facs.map(f=>{
         const isSel=selCourse&&selCourse.facultyId===f.id;
-        return `<div class="faculty-row${isSel?' is-selected':''}" onclick="selectFaculty(${f.id})">
-          <input type="radio" class="fac-radio" name="fg_${cid}" ${isSel?'checked':''} onclick="event.stopPropagation();selectFaculty(${f.id})">
+        return `<div class="faculty-row${isSel?' is-selected':''}" onclick="toggleFaculty(${f.id})">
+          <input type="radio" class="fac-radio" name="fg_${cid}" ${isSel?'checked':''} onclick="event.stopPropagation();toggleFaculty(${f.id})">
           <div class="fac-info">
             <div class="fac-name">${f.name}</div>
             <div class="fac-meta">${f.venue} &bull; <span class="fac-slot">${f.slot}</span></div>
           </div>
-          <button class="btn btn-danger btn-sm" onclick="deleteFaculty(${f.id},event)">X</button>
+          <button class="btn btn-edit btn-sm" onclick="openEditModal(${f.id},event)" title="Edit faculty">Edit</button>
         </div>`;
       }).join('')}</div>
     </div>`;
@@ -746,15 +796,6 @@ function selForSlot(s){ if(!s) return null; return selected.find(x=>x.slotParts.
 function renderTT() {
   const tbl=document.getElementById('tt-tbl');
   const isMorning = (ttView !== 'afternoon');
-
-  // MORNING: left 6 cols = Theory slots (TH_GRID 0-5) timed 8AM-12:50PM
-  //          right 6 cols = Lab slots (LB_GRID 6-11) timed 2PM-7:20PM
-  //
-  // AFTERNOON: left 6 cols = Lab slots (LB_GRID 0-5) timed 8AM-1:20PM
-  //            right 6 cols = Theory slots (TH_GRID 6-11) timed 2PM-7:50PM
-  //
-  // Single timing header row. Slot grid columns never change position.
-
   const leftTimes  = isMorning ? TH_MORNING   : LB_AFTERNOON;
   const rightTimes = isMorning ? LB_MORNING    : TH_AFTERNOON;
   const leftBg     = '#dce3fb';
@@ -762,7 +803,6 @@ function renderTT() {
   const rightBg    = '#dbeafe';
   const rightColor = '#1d4ed8';
 
-  // ---- SINGLE HEADER ROW ----
   let thead=`<tr>`;
   thead+=`<th class="type-th" style="background:#5b72ee;color:#fff;vertical-align:middle">Timing</th>`;
   for(let c=0;c<6;c++){
@@ -776,17 +816,10 @@ function renderTT() {
   }
   thead+=`</tr>`;
 
-  // ---- DATA ROWS ----
   let rows='';
   for(let d=0;d<5;d++){
     let row=`<tr><td class="day-th">${DAYS[d]}</td>`;
-
-    // Left 6 cols
     for(let c=0;c<6;c++){
-      const thSlot = isMorning ? TH_GRID[d][c]   : '';
-      const lbSlot = isMorning ? LB_GRID[d][c]   : LB_GRID[d][c];
-      // Morning left: theory morning slots + morning lab slots (same col index)
-      // Afternoon left: only lab morning slots (LB_GRID 0-5)
       const slotA = isMorning ? TH_GRID[d][c] : LB_GRID[d][c];
       const slotB = isMorning ? LB_GRID[d][c] : '';
       const sel   = selForSlot(slotA)||selForSlot(slotB);
@@ -799,14 +832,8 @@ function renderTT() {
       if(sel){ row+=`<span class="s-name" style="color:${sel.color}">${sel.courseCode}</span><span class="s-venue">${sel.venue}</span>`; }
       row+=`</td>`;
     }
-
-    // Break col
     row+=`<td style="background:#c8cdd8;width:22px;border:1px solid #b0b5c0"></td>`;
-
-    // Right 6 cols
     for(let c=0;c<6;c++){
-      // Morning right: lab afternoon slots (LB_GRID 6-11) + theory afternoon slots (TH_GRID 6-11)
-      // Afternoon right: theory afternoon slots (TH_GRID 6-11) + lab afternoon (LB_GRID 6-11)
       const slotA = isMorning ? LB_GRID[d][c+6] : TH_GRID[d][c+6];
       const slotB = isMorning ? TH_GRID[d][c+6] : LB_GRID[d][c+6];
       const sel   = selForSlot(slotA)||selForSlot(slotB);
@@ -819,11 +846,9 @@ function renderTT() {
       if(sel){ row+=`<span class="s-name" style="color:${sel.color}">${sel.courseCode}</span><span class="s-venue">${sel.venue}</span>`; }
       row+=`</td>`;
     }
-
     row+=`</tr>`;
     rows+=row;
   }
-
   tbl.innerHTML=`<thead>${thead}</thead><tbody>${rows}</tbody>`;
 }
 
@@ -851,10 +876,7 @@ function renderReport() {
 }
 
 // ====== CREDITS ======
-function updateCredits() {
-  const total=selected.reduce((a,s)=>a+s.credits,0);
-  // badge removed from nav — just keep the value for report use
-}
+function updateCredits() {}
 
 // ====== ALERTS ======
 let alertTimer=null;
@@ -871,18 +893,15 @@ function downloadTimetable() {
 
   function ttHtml() {
     let h=`<table style="border-collapse:collapse;width:100%;font-family:Sora,sans-serif;font-size:11px">`;
-    // Row 1: Theory Hours
     h+=`<tr><th style="background:#5b72ee;color:#fff;padding:7px;min-width:52px;vertical-align:middle">THEORY<br>HOURS</th>`;
     for(let c=0;c<6;c++){ const p=TH_M[c].split('|'); h+=`<th style="background:#dce3fb;color:#3730a3;padding:6px;min-width:88px">${p[0]} ${p[1]} ${p[2]}</th>`; }
     h+=`<th style="background:#c8cdd8;width:20px;font-size:9px;color:#555;text-align:center;vertical-align:middle" rowspan="2">L<br>U<br>N<br>C<br>H</th>`;
     for(let c=0;c<6;c++){ const p=TH_A[c].split('|'); h+=`<th style="background:#e0e7ff;color:#3730a3;padding:6px;min-width:88px">${p[0]} ${p[1]} ${p[2]}</th>`; }
     h+=`</tr>`;
-    // Row 2: Lab Hours
     h+=`<tr><th style="background:#5b9bd5;color:#fff;padding:7px;vertical-align:middle">LAB<br>HOURS</th>`;
     for(let c=0;c<6;c++){ const p=LB_M[c].split('|'); h+=`<th style="background:#dbeafe;color:#1d4ed8;padding:6px">${p[0]} ${p[1]} ${p[2]}</th>`; }
     for(let c=0;c<6;c++){ const p=LB_A[c].split('|'); h+=`<th style="background:#eff6ff;color:#1d4ed8;padding:6px">${p[0]} ${p[1]} ${p[2]}</th>`; }
     h+=`</tr>`;
-    // Data rows
     for(let d=0;d<5;d++) {
       h+=`<tr><td style="font-weight:800;color:#4f46e5;background:#f0f2f8;padding:8px;font-size:12px;text-align:center">${DAYS[d]}</td>`;
       for(let c=0;c<12;c++) {
